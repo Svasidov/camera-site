@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camera</title>
+
+<style>
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+
+video, canvas {
+  width: 90%;
+  max-width: 400px;
+  border-radius: 12px;
+  margin-top: 15px;
+}
+
+button {
+  margin: 10px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #00c853;
+  color: black;
+  font-size: 16px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📷 Камера</h2>
+
+<video id="video" autoplay></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<br>
+
+<button onclick="startCamera()">Включить камеру</button>
+<button onclick="takePhoto()">Сделать фото</button>
+<button onclick="sendPhoto()">Отправить</button>
+
+<p id="status"></p>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const status = document.getElementById("status");
+
+let stream = null;
+
+// Включить камеру
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    status.innerText = "✅ Камера включена";
+  } catch (err) {
+    status.innerText = "❌ Доступ запрещён";
+  }
+}
+
+// Сделать фото
+function takePhoto() {
+  if (!stream) {
+    status.innerText = "❗ Сначала включи камеру";
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.drawImage(video, 0, 0);
+
+  status.innerText = "📸 Фото сделано";
+}
+
+// Отправить фото
+function sendPhoto() {
+  const data = canvas.toDataURL("image/jpeg");
+
+  fetch("http://localhost:5000/upload", {
+    method: "POST",
+    body: JSON.stringify({ image: data }),
+    headers: {
+      "Content-Type": "application/json"
+    }
+  })
+  .then(res => res.text())
+  .then(msg => {
+    status.innerText = "✅ Отправлено";
+  })
+  .catch(() => {
+    status.innerText = "❌ Ошибка отправки";
+  });
+}
+</script>
+
+</body>
+</html>
