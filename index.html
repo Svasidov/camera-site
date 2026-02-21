@@ -1,108 +1,118 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Camera</title>
-
 <style>
-body {
-  margin: 0;
-  background: #0b0f14;
-  color: white;
-  font-family: Arial, sans-serif;
-  text-align: center;
-}
-
-video, canvas {
-  width: 90%;
-  max-width: 400px;
-  border-radius: 12px;
-  margin-top: 15px;
-}
-
-button {
-  margin: 10px;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 8px;
-  background: #00c853;
-  color: black;
-  font-size: 16px;
-  cursor: pointer;
-}
+  body{margin:0;background:#0b0f14;color:#e8eef6;font-family:system-ui,Arial,sans-serif;text-align:center;padding:18px}
+  video, img{width:92%;max-width:420px;border-radius:12px;margin-top:12px;background:#000}
+  button{margin:8px;padding:12px 16px;border:0;border-radius:10px;background:#00c853;color:#0b0f14;font-weight:700;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .card{max-width:520px;margin:0 auto}
+  .status{margin-top:10px;opacity:.9}
+  a{color:#7dd3fc;word-break:break-all}
 </style>
 </head>
-
 <body>
+  <div class="card">
+    <h2>📷 Камера</h2>
 
-<h2>📷 Камера</h2>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
 
-<video id="video" autoplay></video>
-<canvas id="canvas" style="display:none;"></canvas>
+    <div>
+      <button id="btnStart">Включить камеру</button>
+      <button id="btnShot" disabled>Сделать фото</button>
+      <button id="btnSend" disabled>Отправить</button>
+    </div>
 
-<br>
+    <div class="status" id="status">Нажми “Включить камеру”.</div>
 
-<button onclick="startCamera()">Включить камеру</button>
-<button onclick="takePhoto()">Сделать фото</button>
-<button onclick="sendPhoto()">Отправить</button>
-
-<p id="status"></p>
+    <div id="result" style="display:none;">
+      <p>✅ Фото загружено: <a id="photoLink" href="#" target="_blank" rel="noopener">открыть</a></p>
+      <img id="preview" alt="Фото" />
+    </div>
+  </div>
 
 <script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const status = document.getElementById("status");
+  const API = "https://camera-server-ay1p.onrender.com/upload";
 
-let stream = null;
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const status = document.getElementById("status");
+  const btnStart = document.getElementById("btnStart");
+  const btnShot  = document.getElementById("btnShot");
+  const btnSend  = document.getElementById("btnSend");
 
-// Включить камеру
-async function startCamera() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
-    status.innerText = "✅ Камера включена";
-  } catch (err) {
-    status.innerText = "❌ Доступ запрещён";
-  }
-}
+  const result = document.getElementById("result");
+  const photoLink = document.getElementById("photoLink");
+  const preview = document.getElementById("preview");
 
-// Сделать фото
-function takePhoto() {
-  if (!stream) {
-    status.innerText = "❗ Сначала включи камеру";
-    return;
-  }
+  let stream = null;
+  let hasPhoto = false;
 
-  const ctx = canvas.getContext("2d");
+  btnStart.onclick = async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      video.srcObject = stream;
+      status.textContent = "✅ Камера включена. Нажми “Сделать фото”.";
+      btnShot.disabled = false;
+    } catch (e) {
+      status.textContent = "❌ Камера не разрешена.";
+    }
+  };
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  btnShot.onclick = () => {
+    if (!stream) return;
 
-  ctx.drawImage(video, 0, 0);
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) {
+      status.textContent = "❗ Подожди секунду, камера ещё запускается.";
+      return;
+    }
 
-  status.innerText = "📸 Фото сделано";
-}
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, w, h);
 
-// Отправить фото
-function sendPhoto() {
-  const data = canvas.toDataURL("image/jpeg");
+    hasPhoto = true;
+    btnSend.disabled = false;
+    status.textContent = "📸 Фото сделано. Нажми “Отправить”.";
+  };
 
- fetch("https://camera-server-ay1p.onrender.com/upload", {
-  method: "POST",
-  body: JSON.stringify({ image: data }),
-  headers: { "Content-Type": "application/json" }
-})
-  })
-  .then(res => res.text())
-  .then(msg => {
-    status.innerText = "✅ Отправлено";
-  })
-  .catch(() => {
-    status.innerText = "❌ Ошибка отправки";
-  });
-}
+  btnSend.onclick = async () => {
+    if (!hasPhoto) return;
+
+    btnSend.disabled = true;
+    status.textContent = "⏳ Отправка...";
+
+    const data = canvas.toDataURL("image/jpeg", 0.9);
+
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: data })
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.status !== "ok") throw new Error("bad response");
+
+      photoLink.href = json.photo_url;
+      photoLink.textContent = json.photo_url;
+
+      preview.src = json.photo_url;
+      result.style.display = "block";
+
+      status.textContent = "✅ Отправлено. Ссылка появилась ниже.";
+    } catch (e) {
+      status.textContent = "❌ Ошибка отправки. Попробуй ещё раз.";
+      btnSend.disabled = false;
+    }
+  };
 </script>
-
 </body>
 </html>
