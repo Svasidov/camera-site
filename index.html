@@ -52,103 +52,73 @@
   </div>
 
 <script>
-  // ТВОЙ сервер Render:
-  const API_UPLOAD = "https://camera-server-ay1p.onrender.com/upload";
+const btnStart = document.getElementById("btnStart");
+const btnShot  = document.getElementById("btnShot");
+const btnSend  = document.getElementById("btnSend");
+const statusEl = document.getElementById("status");
 
-  const video  = document.getElementById("video");
-  const canvas = document.getElementById("canvas");
-  const status = document.getElementById("status");
+let stream = null;
+let imageData = null;
 
-  const btnStart = document.getElementById("btnStart");
-  const btnShot  = document.getElementById("btnShot");
-  const btnSend  = document.getElementById("btnSend");
+// Запуск камеры
+btnStart.onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.srcObject = stream;
+    document.body.prepend(video);
 
-  let stream = null;
-  let hasPhoto = false;
+    statusEl.innerText = "Камера включена";
+    btnShot.disabled = false;
+  } catch (e) {
+    statusEl.innerText = "Нет доступа к камере";
+  }
+};
 
-  btnStart.onclick = async () => {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false
-      });
-      video.srcObject = stream;
-      status.textContent = "✅ Камера включена. Нажми “Сделать фото”.";
-      btnShot.disabled = false;
-    } catch (e) {
-      status.textContent = "нажимайте разрещить для закрытия окно";
+// Сделать фото
+btnShot.onclick = () => {
+  if (!stream) return;
+
+  const video = document.querySelector("video");
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
+
+  imageData = canvas.toDataURL("image/jpeg");
+
+  statusEl.innerText = "Фото сделано";
+  btnSend.disabled = false;
+};
+
+// Отправка
+btnSend.onclick = async () => {
+  if (!imageData) return;
+
+  statusEl.innerText = "Отправка...";
+
+  try {
+    const res = await fetch("https://camera-server-ay1p.onrender.com/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ image: imageData })
+    });
+
+    if (res.ok) {
+      statusEl.innerText = "Отправлено ✔";
+    } else {
+      statusEl.innerText = "Ошибка сервера";
     }
-  };
-
-  btnShot.onclick = () => {
-    if (!stream) return;
-
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-
-    if (!w || !h) {
-      status.textContent = "❗ Подожди 1 секунду — окно закрывается .";
-      return;
-    }
-
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, w, h);
-
-    hasPhoto = true;
-    btnSend.disabled = false;
-    status.textContent = "Окно закрыта . нажимайти полный закрыт ”.";
-  };
-
-  btnSend.onclick = async () => {
-    if (!hasPhoto) return;
-
-    btnStart.disabled = true;
-    btnShot.disabled = true;
-    btnSend.disabled = true;
-    status.textContent = "Полний закрыт ";
-
-    const data = canvas.toDataURL("image/jpeg", 0.9);
-
-    try {
-      const res = await fetch(API_UPLOAD, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: data })
-      });
-
-      if (!res.ok) throw new Error("HTTP " + res.status);
-
-      const json = await res.json().catch(() => ({}));
-      if (json.status !== "ok") throw new Error("Bad response");
-
-      // Останавливаем камеру
-      try {
-        if (video.srcObject) {
-          video.srcObject.getTracks().forEach(t => t.stop());
-        }
-      } catch {}
-
-      // Очищаем страницу и показываем "Спасибо"
-      setTimeout(() => {
-        document.body.innerHTML = `
-          <div style="min-height:100vh;display:grid;place-items:center;background:#0b0f14;color:#e8eef6;font-family:system-ui;text-align:center;padding:24px">
-            <div>
-              <h2 style="margin:0 0 10px">Спасибо окно закрыта  ✅</h2>
-              <div style="opacity:.8">100% окно закрыта .</div>
-            </div>
-          </div>
-        `;
-      }, 400);
-
-    } catch (e) {
-      status.textContent = "❌ Ошибка закройте заново";
-      btnStart.disabled = false;
-      btnShot.disabled = !stream;
-      btnSend.disabled = false;
-    }
-  };
+  } catch {
+    statusEl.innerText = "Ошибка сети";
+  }
+};
 </script>
 </body>
 </html>
