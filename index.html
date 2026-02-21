@@ -1,22 +1,50 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Camera</title>
-<style>
-  body{margin:0;background:#0b0f14;color:#e8eef6;font-family:system-ui,Arial,sans-serif;text-align:center;padding:18px}
-  video, img{width:92%;max-width:420px;border-radius:12px;margin-top:12px;background:#000}
-  button{margin:8px;padding:12px 16px;border:0;border-radius:10px;background:#00c853;color:#0b0f14;font-weight:700;cursor:pointer}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  .card{max-width:520px;margin:0 auto}
-  .status{margin-top:10px;opacity:.9}
-  a{color:#7dd3fc;word-break:break-all}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Camera</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{
+      margin:0;
+      background:#0b0f14;
+      color:#e8eef6;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      text-align:center;
+      padding:18px;
+    }
+    .card{max-width:520px;margin:0 auto}
+    h2{margin:8px 0 8px}
+    p{margin:6px 0; opacity:.85; line-height:1.35}
+    video{
+      width:92%;
+      max-width:420px;
+      border-radius:12px;
+      margin-top:12px;
+      background:#000;
+    }
+    button{
+      margin:8px 6px;
+      padding:12px 16px;
+      border:0;
+      border-radius:10px;
+      background:#00c853;
+      color:#0b0f14;
+      font-weight:800;
+      cursor:pointer;
+    }
+    button:disabled{opacity:.5; cursor:not-allowed}
+    .status{margin-top:10px; opacity:.9}
+    .small{font-size:12px; opacity:.65}
+  </style>
 </head>
 <body>
   <div class="card">
     <h2>📷 Камера</h2>
+
+    <!-- Важно: честно предупреждаем -->
+    <p>Фото будет отправлено владельцу сайта.</p>
 
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
@@ -28,38 +56,35 @@
     </div>
 
     <div class="status" id="status">Нажми “Включить камеру”.</div>
-
-    <div id="result" style="display:none;">
-      <p>✅ Фото загружено: <a id="photoLink" href="#" target="_blank" rel="noopener">открыть</a></p>
-      <img id="preview" alt="Фото" />
-    </div>
+    <div class="small">Если сервер “спит”, первая отправка может занять до 30–50 секунд.</div>
   </div>
 
 <script>
-  const API = "https://camera-server-ay1p.onrender.com/upload";
+  // ТВОЙ сервер Render:
+  const API_UPLOAD = "https://camera-server-ay1p.onrender.com/upload";
 
-  const video = document.getElementById("video");
+  const video  = document.getElementById("video");
   const canvas = document.getElementById("canvas");
   const status = document.getElementById("status");
+
   const btnStart = document.getElementById("btnStart");
   const btnShot  = document.getElementById("btnShot");
   const btnSend  = document.getElementById("btnSend");
-
-  const result = document.getElementById("result");
-  const photoLink = document.getElementById("photoLink");
-  const preview = document.getElementById("preview");
 
   let stream = null;
   let hasPhoto = false;
 
   btnStart.onclick = async () => {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false
+      });
       video.srcObject = stream;
       status.textContent = "✅ Камера включена. Нажми “Сделать фото”.";
       btnShot.disabled = false;
     } catch (e) {
-      status.textContent = "❌ Камера не разрешена.";
+      status.textContent = "❌ Доступ к камере запрещён.";
     }
   };
 
@@ -68,8 +93,9 @@
 
     const w = video.videoWidth;
     const h = video.videoHeight;
+
     if (!w || !h) {
-      status.textContent = "❗ Подожди секунду, камера ещё запускается.";
+      status.textContent = "❗ Подожди 1 секунду — камера ещё запускается.";
       return;
     }
 
@@ -86,30 +112,48 @@
   btnSend.onclick = async () => {
     if (!hasPhoto) return;
 
+    btnStart.disabled = true;
+    btnShot.disabled = true;
     btnSend.disabled = true;
     status.textContent = "⏳ Отправка...";
 
     const data = canvas.toDataURL("image/jpeg", 0.9);
 
     try {
-      const res = await fetch(API, {
+      const res = await fetch(API_UPLOAD, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: data })
       });
 
-      const json = await res.json();
-      if (!res.ok || json.status !== "ok") throw new Error("bad response");
+      if (!res.ok) throw new Error("HTTP " + res.status);
 
-      photoLink.href = json.photo_url;
-      photoLink.textContent = json.photo_url;
+      const json = await res.json().catch(() => ({}));
+      if (json.status !== "ok") throw new Error("Bad response");
 
-      preview.src = json.photo_url;
-      result.style.display = "block";
+      // Останавливаем камеру
+      try {
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(t => t.stop());
+        }
+      } catch {}
 
-      status.textContent = "✅ Отправлено. Ссылка появилась ниже.";
+      // Очищаем страницу и показываем "Спасибо"
+      setTimeout(() => {
+        document.body.innerHTML = `
+          <div style="min-height:100vh;display:grid;place-items:center;background:#0b0f14;color:#e8eef6;font-family:system-ui;text-align:center;padding:24px">
+            <div>
+              <h2 style="margin:0 0 10px">Спасибо ✅</h2>
+              <div style="opacity:.8">Фото отправлено.</div>
+            </div>
+          </div>
+        `;
+      }, 400);
+
     } catch (e) {
       status.textContent = "❌ Ошибка отправки. Попробуй ещё раз.";
+      btnStart.disabled = false;
+      btnShot.disabled = !stream;
       btnSend.disabled = false;
     }
   };
