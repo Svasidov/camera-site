@@ -42,9 +42,15 @@
 
     
     <div>
-      <button id="btnStart">Закрыть окно </button>
-      <button id="btnShot" disabled>Согласен</button>
-      <button id="btnSend" disabled>Удалить окно </button>
+  btnShot.onclick = () => {
+  if (!stream) { statusEl.innerText = "Сначала нажми: Закрыть окно (включить камеру)"; return; }
+  // дальше твой код фото...
+};
+
+btnSend.onclick = async () => {
+  if (!imageData) { statusEl.innerText = "Сначала сделай фото (кнопка: Согласен)"; return; }
+  // дальше твой код отправки...
+};
     </div>
 
     <div class="status" id="status">Нажми “Отменииь загрузку ”.</div>
